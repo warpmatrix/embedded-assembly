@@ -1,0 +1,519 @@
+GPIOA_BASE  EQU 0x40010800      ; GPIOA基地址
+GPIOA_CRL   EQU GPIOA_BASE      ; 低配置寄存器
+GPIOA_CRH   EQU GPIOA_BASE+0x04 ; 高配置寄存器
+GPIOA_IDR   EQU GPIOA_BASE+0x08 ; 输入数据寄存器
+GPIOA_ODR   EQU GPIOA_BASE+0x0c ; 输出数据寄存器
+GPIOA_BSRR  EQU GPIOA_BASE+0x10 ; 端口位置位/清除寄存器
+GPIOA_BRR   EQU GPIOA_BASE+0x14 ; 端口位清除寄存器
+CFGAL       EQU 0x33333333      ; PA0~7：  推挽输出，50MHz
+CFGAH       EQU 0x00000333      ; PA8~10： 推挽输出，50MHz
+
+GPIOB_BASE EQU 0x40010c00       ; GPIOB基地址
+GPIOB_CRL  EQU GPIOB_BASE+0x00  ; GPIOB低配置寄存器
+GPIOB_CRH  EQU GPIOB_BASE+0x04  ; GPIOB高配置寄存器
+GPIOB_IDR  EQU GPIOB_BASE+0x08  ; GPIOB输入数据寄存器
+GPIOB_ODR  EQU GPIOB_BASE+0x0c  ; GPIOB输出数据寄存器
+GPIOB_BSRR EQU GPIOB_BASE+0x10  ; GPIOB位端口置位/清零寄存器
+CFGBL      EQU 0x0000      		; GPIOB配置：PB0--模拟输入
+	
+RCC_APB2ENR EQU 0x40021018
+GIOPAEN     EQU 0x00000004  	; GPIOA 使能位
+GIOPBEN     EQU 0x00000008      ; GPIOB 使能位
+AFIOEN      EQU 0x00000001      ; AFIO 时钟使能位
+ADC1EN		EQU 0x00000200		; ADC1 使能位
+APB2ENALL   EQU GIOPAEN :OR: GIOPBEN :OR: ADC1EN :OR: AFIOEN
+
+ADC1_BASE	EQU	0x40012400
+ADC1_SR		EQU ADC1_BASE+0x00	; ADC1 状态寄存器
+ADC1_CR1	EQU ADC1_BASE+0x04	; ADC1 控制寄存器1
+ADC1_CR2	EQU ADC1_BASE+0x08	; ADC1 控制寄存器2
+ADC1_SMPR1 	EQU ADC1_BASE+0x0c 	; ADC采样时间寄存器1
+ADC1_SMPR2 	EQU ADC1_BASE+0x10 	; ADC采样时间寄存器2
+ADC1_SQR1	EQU ADC1_BASE+0x2c	; ADC规则序列寄存器1
+ADC1_SQR3	EQU ADC1_BASE+0x34	; ADC规则序列寄存器3
+ADC1_DR		EQU ADC1_BASE+0x4c	; ADC规则数据寄存器
+	
+ISER_ADC1_2	EQU 0xe000e100
+ADC1_2_ITEN EQU 0x00040000
+
+; 液晶显示屏指令
+CLEAR		EQU 0x01
+RESETCUR	EQU	0x02
+INMODE		EQU	0x06
+DISPON		EQU	0x0c
+DISPMODE	EQU 0x38
+DEFSYM		EQU 0x40
+CRLF		EQU	0xc0
+
+WRTSYM		EQU	0x0200
+WRTSPACE	EQU	0x0220
+WRTDOT		EQU	0x022e
+WRTDIGIT	EQU 0x0230
+WRTLETTER	EQU 0x0241
+
+ADC20	EQU	0x0817
+ADC21	EQU	0x07e9
+ADC22	EQU	0x07bc
+ADC23	EQU	0x0790
+ADC24	EQU	0x0765
+ADC25	EQU	0x073c
+ADC26	EQU	0x0713
+ADC27	EQU	0x06ed
+ADC28	EQU	0x06c7
+ADC29	EQU	0x06a3
+
+STACK_TOP EQU 0X20002000
+ AREA MYDATA,DATA,READWRITE   ; AREA不能顶格写(RAM,自动初始化为0)
+DIG0	DCB 0x00
+ AREA RESET,CODE,READONLY   ; AREA不能顶格写
+ DCD STACK_TOP 				; MSP主堆栈指针
+ DCD START   				; 复位，PC初始值 
+ SPACE 0x88-8
+ DCD   ADC1_2IRHandler      ; ADC1_2
+ ENTRY         				; 指示开始执行,有了C文件，ENTRY注释掉
+START                      	; 所有的标号必须顶格写，且无冒号
+
+ BL RCC_CONFIG_72MHZ
+ BL InitComp
+ BL LedDefDegSym
+ BL InitLed
+
+; ADC 转换电压
+ MOV	R0, #1
+ LDR	R1, =ADC1_CR2
+ STR	R0, [R1]
+ 
+LOOP
+ B LOOP
+ 
+ 
+LedDefDegSym
+ PUSH	{R0, R1, R2, R3, LR}
+ LDR	R1, =GPIOA_ODR
+ MOV	R2, #DEFSYM
+ ; 确定自定义字符的序号 3
+ ADD	R2, #0x18
+ 
+ MOV	R3, #WRTSYM
+ 
+ ADD	R0, R2, #0
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x10
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #1
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x06
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #2
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x09
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #3
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x08
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #4
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x08
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #5
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x09
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #6
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x06
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ ADD	R0, R2, #7
+ STR	R0, [R1]
+ BL ExcCmd
+ ADD	R0, R3, #0x00
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ POP	{R0, R1, R2, R3, PC}
+
+ 
+InitLed
+ PUSH	{R0, R1, LR}
+ LDR	R1, =GPIOA_ODR
+ 
+ MOV	R0, #DISPMODE
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ MOV	R0, #DISPON
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ MOV	R0, #INMODE
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ MOV	R0, #CLEAR
+ STR	R0, [R1]
+ BL ExcCmd
+ 
+ MOV	R0, #RESETCUR
+ STR	R0, [R1]
+ BL	ExcCmd
+ 
+ POP	{R0, R1, PC}
+ 
+ 
+ExcCmd
+ PUSH	{R0, R1, LR}
+ 
+ LDR	R1, =GPIOA_BSRR
+ MOV	R0, #0x00000400
+ STR	R0, [R1]
+ MOV	R0, #0x04000000
+ STR	R0, [R1]
+ BL Delay
+ 
+ POP	{R0, R1, PC}
+ 
+ 
+DispData
+  PUSH	{R0, R1, LR}
+  
+  LDR	R1, =GPIOA_ODR
+  MOV	R2, #WRTDIGIT
+ 
+  ADD	R0, R2, #2
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #0
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #2
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #0
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #WRTDOT
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #1
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #1
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #WRTDOT
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #8
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #WRTSPACE
+  STR	R0, [R1]
+  BL ExcCmd
+  STR	R0, [R1]
+  BL ExcCmd
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #2
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  LDR	R0, =DIG0
+  LDR	R0, [R0]
+  ADD	R0, R2
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ; MOV	R0, #WRTSPACE
+  ; STR	R0, [R1]
+  ; BL ExcCmd
+ 
+  MOV	R0, #WRTSYM
+  ADD	R0, #0x03
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #CRLF
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R2, #WRTLETTER
+  ADD	R0, R2, #('S'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('Y'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('S'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('U'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #WRTDOT
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('E'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('D'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('U'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  MOV	R0, #WRTDOT
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('C'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+ 
+  ADD	R0, R2, #('N'-'A')
+  STR	R0, [R1]
+  BL ExcCmd
+  POP	{R0, R1, PC}
+
+Delay
+  PUSH {R0,R1,R2,LR}
+               
+  MOVS R0,#0
+  MOVS R1,#0
+  MOVS R2,#0
+
+DelayLoop0        
+  ADDS R0,#1
+
+  CMP R0,#33
+  BCC DelayLoop0
+ 
+  MOVS R0,#0
+  ADDS R1,#1
+  CMP R1,#33
+  BCC DelayLoop0
+
+  MOVS R0,#0
+  MOVS R1,#0
+  ADDS R2,#1
+  CMP R2,#30
+  BCC DelayLoop0
+  
+  POP {R0,R1,R2,PC}
+  
+  
+InitComp
+ PUSH {R0, R1, LR}
+  
+ ; 设置RCC的APB2使能寄存器，启动 GPIOA、GPIOB、AFIO、ADC1 部件
+ LDR    R1, =RCC_APB2ENR     ; 0X4002101C
+ LDR    R0, =APB2ENALL
+ STR    R0, [R1]             ; 使能 GPIOA, GPIOB, AFIO, ADC1
+
+ ; 设置 GPIOA 配置寄存器，令 PA0~PA10 设置为推挽输出(50MHz)
+ MOV    R0, #CFGAL
+ LDR    R1, =GPIOA_CRL
+ STR    R0, [R1]
+ LDR    R0, =CFGAH
+ LDR    R1, =GPIOA_CRH
+ STR    R0, [R1]
+ 
+ ;设置GPIOB低配置寄存器：PB0 模拟输入
+ MOV    R0, #CFGBL
+ LDR    R1, =GPIOB_CRL
+ STR    R0, [R1]
+ 
+ ; 设置 NVIC 的中断设置运训寄存器(ISER)
+ MOV    R0, #ADC1_2_ITEN
+ LDR    R1, =ISER_ADC1_2   ;0xE000E100
+ STR    R0, [R1] 
+ 
+ ; 初始化 adc：默认独立模式、禁止扫描连续转换、软件开启转换右对齐、1个规则转换通道
+ MOV	R0, #8
+ LDR	R1, =ADC1_SQR3
+ STR	R0, [R1]
+ MOV	R0, #0x20
+ LDR	R1, =ADC1_CR1
+ STR	R0, [R1]
+ MOV	R0, #1
+ LDR	R1, =ADC1_CR2
+ STR	R0, [R1]
+ 
+ POP {R0, R1, PC}
+  
+  
+ADC1_2IRHandler
+ PUSH	{R0, R1, LR}
+ 
+ LDR	R1, =ADC1_DR
+ LDR	R0, [R1]
+ 
+ LDR	R1, =ADC20
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #0
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC21
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #1
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC22
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #2
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC23
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #3
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC24
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #4
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC25
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #5
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC26
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #6
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC27
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #7
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC28
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #8
+ BGE	END_CONV
+ 
+ LDR	R1, =ADC29
+ CMP	R0, R1
+ ITT	GE
+ MOVGE	R0, #9
+ BGE	END_CONV
+ 
+ MOV	R0, #9
+
+END_CONV
+ LDR	R1, =DIG0
+ STR	R0, [R1]
+ BL	DispData
+ 
+ LDR	R1, =ADC1_SR
+ MOV	R0, #0
+ STR	R0, [R1]
+ 
+ POP	{R0, R1, PC}
+  
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;RCC  时钟配置 HCLK=72MHz=HSE*9
+;;;PCLK2=HCLK  PCLK1=HCLK/2
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RCC_CONFIG_72MHZ
+ LDR    R1,=0X40021000 ;RCC_CR
+ LDR    R0,[R1]
+ LDR    R2,=0X00010000 ;HSEON
+ ORR    R0,R2
+ STR    R0,[R1]
+WAIT_HSE_RDY
+ LDR    R2,=0X00020000 ;HSERDY
+ LDR    R0,[R1]
+ ANDS   R0,R2
+ CMP    R0,#0
+ BEQ    WAIT_HSE_RDY
+ LDR    R1,=0X40022000 ;FLASH_ACR
+ MOV    R0,#0X12
+ STR    R0,[R1]
+ LDR    R1,=0X40021004 ;RCC_CFGR时钟配置寄存器
+ LDR    R0,[R1]
+;PLL倍频系数,PCLK2,PCLK1分频设置
+;HSE 9倍频PCLK2=HCLK,PCLK1=HCLK/2
+;HCLK=72MHz 0x001D0400
+;HCLK=64MHz 0x00190400
+;HCLK=48MHz 0x00110400
+;HCLK=32MHz 0x00090400
+;HCLK=24MHz 0x00050400
+;HCLK=16MHz 0x00010400
+ LDR    R2,=0x001D0400 
+ ORR    R0,R2
+ STR    R0,[R1]
+ LDR    R1,=0X40021000 ;RCC_CR
+ LDR    R0,[R1]
+ LDR    R2,=0X01000000	;PLLON
+ ORR    R0,R2
+ STR    R0,[R1]
+WAIT_PLL_RDY
+ LDR    R2,=0X02000000	;PLLRDY
+ LDR    R0,[R1]
+ ANDS   R0,R2
+ CMP    R0,#0
+ BEQ    WAIT_PLL_RDY
+ LDR    R1,=0X40021004	;RCC_CFGR
+ LDR    R0,[R1]
+ MOV    R2,#0Xc002		; 配置 ADC 预分频器
+ ORR    R0,R2
+ STR    R0,[R1]
+WAIT_HCLK_USEPLL
+ LDR    R0,[R1]
+ ANDS   R0,#0X08
+ CMP    R0,#0X08
+ BNE    WAIT_HCLK_USEPLL
+ BX LR
+
+ END

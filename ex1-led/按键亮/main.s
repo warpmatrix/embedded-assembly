@@ -1,0 +1,56 @@
+; 本项目实现按键时 led 灯亮的效果
+LIGHT		EQU	0x0000000c
+DARK		EQU	0x00000008
+
+BIT2       	EQU 0x00000004
+BIT3       	EQU 0x00000008
+LED        	EQU BIT2        ;LED--PA.2
+CFGA      	EQU 0x00008300  ;PA.2: 推挽输出，50MHz；PA.3：上拉输入，50MHz
+	
+GPIOA      	EQU 0x40010800  ;GPIOA 地址
+GPIOA_CRL  	EQU GPIOA+0x00  ;低配置寄存器
+GPIOA_CRH  	EQU GPIOA+0x04  ;高配置寄存器
+GPIOA_ODR  	EQU GPIOA+0x0C  ;输出，偏移地址 0Ch
+GPIOA_IDR  	EQU GPIOA+0x08  ;输入，偏移地址 08h
+GPIOA_BSRR 	EQU GPIOA+0x10  ;低置位，高清除偏移地址 10h
+GPIOA_BRR  	EQU GPIOA+0x14  ;清除寄存器偏移地址 14h
+
+GIOPAEN    	EQU 0x00000004  ;GPIOA 时钟使能
+RCC_APB2ENR EQU 0x40021018
+
+STACK_TOP EQU 0x20002000
+ AREA RESET,CODE,READONLY
+ DCD STACK_TOP 				; MSP 主堆栈指针
+ DCD START   				; 复位 PC 初始值
+ ENTRY         				; 指示开始执行
+START                      	
+ LDR    R1, =RCC_APB2ENR    ; 0x40021018
+ LDR    R0, [R1]
+ LDR    R2, =GIOPAEN         
+ ORR    R0, R2
+ STR    R0, [R1]             ; 使能 GPIOA 时钟
+ 
+;LED--PA.2  推挽输出 50MHz  0011；PA.3	上拉输入，50MHz，1000
+ MOV    R0, #CFGA
+ LDR    R1, =GPIOA_CRL
+ STR    R0, [R1]
+ MOV 	R0, #BIT3
+ LDR	R1, =GPIOA_ODR
+ STR	R0, [R1]
+ 
+ NOP
+ NOP
+LOOP5
+ LDR 	R1, =GPIOA_IDR
+ LDR	R0, [R1]
+ LDR 	R1, =GPIOA_ODR
+ 
+ TST 	R0, #BIT3
+ ITE EQ
+ MOVEQ	R0, #LIGHT
+ MOVNE	R0, #DARK
+ 
+ STR	R0, [R1]
+ LDR	R0, [R1]
+ B LOOP5
+END
